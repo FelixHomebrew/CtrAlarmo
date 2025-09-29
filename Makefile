@@ -45,7 +45,7 @@ CIA_HTID			:= 0xC4A1A				# High title ID
 CIA_PRODCODE		:= CTR-JUE-FALR
 CIA_PID				:= "$(EXP_FILENAME)"	# Process ID (≤8 chars)
 CIA_VERSION_MAJOR	:= 1
-CIA_VERSION_MINOR	:= 0
+CIA_VERSION_MINOR	:= 1
 CIA_VERSION_MICRO	:= 0
 
 # 3DSX target only
