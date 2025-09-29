@@ -1,15 +1,22 @@
 # CTR Alarmo
-A silly alarm clock app for the Nintendo 3DS made with libctru
+A simple, configurable alarm clock app for the Nintendo 3DS made with libctru
 
 ![insc](./docres/insc.png)
 
 ## Features
 * Regular audible beep
-* Power/Wireless/News LED blink support
+* Power/Wireless/News LEDs blink support
 * 2 ring modes (Static \& Progressive)
-* Rings for 10 minutes, then sleeps 5-minute before ringing again
+* Rings for 10 minutes, then sleeps 5 minutes before ringing again
 * Adjustable screens brightness
 * Sleep mode persistence (no sound/LEDs only)
+
+New features would may be added in the future.
+
+## Usage
+Alarm time can be set from Settings menu: Press `SELECT` (hotkeys are listed on bottom screen) then look for "Redefine alarm".
+
+Adjust other settings depending on your preferences.
 
 ## Compiling
 Main compilation requires [devkitPro](https://github.com/devkitPro/installer/releases) with libctru, citro2D, citro3D libs properly installed.
