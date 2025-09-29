@@ -3,8 +3,8 @@
 #include <string.h>
 
 /**
- * Implementation of "fnfHw" RGB LED changer from
- * FNF Citrus Engine source which is itself based on a older CtrRgbPat source
+ * Implementation of real-time RGB LED changer from CtrRgbPatty source
+   Huge credits to CPunch who's behind this
  */
 
 bool setPattern(/*FnfHw::McuLedPattern*/ rgbl_McuLedPattern pat) {
@@ -24,4 +24,5 @@ bool rgbl_changeLed(/*FnfHw::McuLedPattern*/ rgbl_McuLedPattern pat) {
         if (!setPattern(pat)) return false;
     }
     return true;
+
 }
