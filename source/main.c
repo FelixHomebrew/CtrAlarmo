@@ -45,9 +45,10 @@ struct tm* alarmoCurTime;
 
 bool alarmoState = true;
 
-
 // Alarmo res
 C2D_Font alarmoFontDefault, alarmoFontSystem;
+
+Handle alarmoMutex;
 
 // Tiny notify
 struct {
@@ -55,8 +56,10 @@ struct {
     u64 end;
 } alarmoTinyNotifyCur = {0};
 void alarmoTinyNotify(char* msg, u8 sec) {
+    svcWaitSynchronization(alarmoMutex, U64_MAX);
     alarmoTinyNotifyCur.msg = msg;
     alarmoTinyNotifyCur.end = osGetTime() + 1000*sec;
+    svcReleaseMutex(alarmoMutex);
 }
 
 // IO Helpers
@@ -101,7 +104,7 @@ void alarmoIORead() {
     fclose(fp);
 }
 
-bool alarmoShut = false;
+volatile bool alarmoShut = false;
 
 // Alarmo state
 void alarmoMainInit() {
@@ -178,7 +181,7 @@ static void alarmoSetSwitch(u8 flag) {
 }
 
 vu16 alarmoRinging = 0;
-u64 alarmoRepeatAt = 0;
+vu64 alarmoRepeatAt = 0;
 
 #define alarmoStop ((alarmoRinging || alarmoRepeatAt != 0) && alarmoShut)
 #define srwait(MS, ROUTINE) { \
@@ -338,6 +341,9 @@ void beepECb() {
     if (alarmoShut) {
         alarmoShut = false;
     }
+
+    //alarmoRingTime[1] = (alarmoCurTime->tm_min+1) % 60;
+    //alarmoRingTime[0] = alarmoRingTime[1]==0 ? alarmoCurTime->tm_hour+1 : alarmoCurTime->tm_hour;
 }
 
 bool alarmoGetOut = false;
@@ -447,6 +453,8 @@ int main() {
     alarmoIORead();
     alarmoMainInit();
 
+    svcCreateMutex(&alarmoMutex, false);
+
     Thread mainParamT;
     {
         s32 prio;
@@ -461,7 +469,10 @@ int main() {
         u32 kDown = hidKeysDown();
 
         if (alarmoRinging || alarmoRepeatAt != 0) {
-            if (kDown) alarmoShut = true;
+            
+            if (kDown) {
+                alarmoShut = true;
+            }
             //while (alarmoRinging != 0);
         }
 
@@ -535,7 +546,6 @@ int main() {
         C2D_TargetClear(renderTop, C2D_Color32(0x00,0x00,0x00,0xFF));
 		C2D_SceneBegin(renderTop);
 		{
-
             if (!alarmoRinging || (alarmoRinging && osGetTime()%1000 < 500) || alarmoShut) {
                 time_t unixTime = time(NULL);
                 alarmoCurTime = gmtime((const time_t*)&unixTime);
@@ -655,6 +665,7 @@ int main() {
                 }
             }
             {
+                svcWaitSynchronization(alarmoMutex, U64_MAX);
                 C2D_TextBufClear(botBuf);
                 C2D_Text botText;
                 char botChar[21];
@@ -688,6 +699,7 @@ int main() {
                     0.5f, 0.5f,
                     C2D_Color32f(1,1,1,1)
                 );
+                svcReleaseMutex(alarmoMutex);
             }
         }
         if (alarmoState) {
@@ -718,6 +730,8 @@ int main() {
 
     alarmoGetOut = true;
     threadJoin(mainParamT, U64_MAX);
+
+    svcCloseHandle(alarmoMutex);
 
     gspLcdInit();
     GSPLCD_PowerOnAllBacklights();
