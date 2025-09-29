@@ -196,6 +196,7 @@ endif
 
 #---------------------------------------------------------------------------------
 3dsx: $(BUILD) $(GFXBUILD) $(DEPSDIR) $(ROMFS_T3XFILES) $(ROMFS_FONTFILES) $(T3XHFILES)
+	@mkdir -p export
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
 cia: 3dsx
