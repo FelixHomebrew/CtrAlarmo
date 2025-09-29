@@ -9,6 +9,7 @@ A silly alarm clock app for the Nintendo 3DS made with libctru
 * 2 ring modes (Static \& Progressive)
 * Rings for 10 minutes, then sleeps 5-minute before ringing again
 * Adjustable screens brightness
+* Sleep mode persistence (no sound/LEDs only)
 
 ## Compiling
 Main compilation requires [devkitPro](https://github.com/devkitPro/installer/releases) with libctru, citro2D, citro3D libs properly installed.
@@ -21,5 +22,3 @@ make cia   # Outputs CIA
 make all   # Alias for both 3dsx and cia targets
 make clean # Cleans generated files
 ```
-
-
