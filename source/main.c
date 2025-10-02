@@ -406,16 +406,12 @@ static void aptHookFunc(APT_HookType hookType, void* param) {
             gspLcdExit();
             break;
         case APTHOOK_ONRESTORE:
-        case APTHOOK_ONWAKEUP:
             if (alarmoRinging) alarmoShut = true;
             if (alarmoSettings & ASET_POBS && alarmoState) {
                 gspLcdInit();
                 GSPLCD_PowerOffBacklight(GSPLCD_SCREEN_BOTTOM);
                 gspLcdExit();
             }
-            break;
-        case APTHOOK_ONSLEEP:
-            if (alarmoRinging) alarmoShut = true;
             break;
         default:
             break;
@@ -432,7 +428,6 @@ int main() {
 
     aptInit();
     aptSetSleepAllowed(false);
-    APT_SetAppCpuTimeLimit(30);
 
     aptHook(&cookie, aptHookFunc, NULL);
 
@@ -450,6 +445,14 @@ int main() {
     alarmoFontDefault = C2D_FontLoad("romfs:/fnt/G7Segment7S5.bcfnt");
     alarmoFontSystem = C2D_FontLoadSystem(CFG_LANGUAGE_EN);
 
+    // Avoid sleep mode when closing shell
+    mcuHwcInit();
+    u32 im;
+    MCUHWC_ReadRegister(0x18, &im, 4);
+    im |= 1<<5;
+    MCUHWC_WriteRegister(0x18, &im, 4);
+    mcuHwcExit();
+
     alarmoIORead();
     alarmoMainInit();
 
@@ -459,21 +462,56 @@ int main() {
     {
         s32 prio;
         svcGetThreadPriority(&prio, CUR_THREAD_HANDLE);
-        mainParamT = threadCreate(mainPara, NULL, 0x1000, prio-0x10, 0, true);
+        mainParamT = threadCreate(mainPara, NULL, 0x1000, prio+0x2, 0, true);
     }
 
-    //u64 lastOt = U64_MAX;
+    u8 shell[2] = {1};
+    u64 osTime = 0;
     while (aptMainLoop()) {
+        {
+            time_t unixTime = time(NULL);
+            alarmoCurTime = gmtime((const time_t*)&unixTime);
+            osTime = osGetTime();
+        }
         hidScanInput();
-
         u32 kDown = hidKeysDown();
-
         if (alarmoRinging || alarmoRepeatAt != 0) {
-            
             if (kDown) {
                 alarmoShut = true;
             }
-            //while (alarmoRinging != 0);
+        }
+        ptmuInit();
+        PTMU_GetShellState(&shell[0]);
+        ptmuExit();
+        if (shell[0] != shell[1]) {
+            gspLcdInit();
+            if (shell[0]) {
+                if (!(alarmoRinging && alarmoSettings & ASET_PWLB)) {
+                    mcuHwcInit();
+                    u8 mcuPWB = 0xFF;
+                    MCUHWC_WriteRegister(0x28, &mcuPWB, 1);
+                    mcuHwcExit();
+                }
+                if (alarmoSettings & ASET_POBS) {
+                    GSPLCD_PowerOnBacklight(GSPLCD_SCREEN_TOP);
+                } else {
+                    GSPLCD_PowerOnBacklight(GSPLCD_SCREEN_BOTH);
+                }
+            } else {
+                if (!(alarmoRinging && alarmoSettings & ASET_PWLB)) {
+                    mcuHwcInit();
+                    u8 mcuPWB = 0x20;
+                    MCUHWC_WriteRegister(0x28, &mcuPWB, 1);
+                    mcuHwcExit();
+                }
+                GSPLCD_PowerOffBacklight(GSPLCD_SCREEN_BOTH);
+            }
+            gspLcdExit();
+        }
+        shell[1] = shell[0];
+        if (!shell[0]) {
+            svcSleepThread(1000000000 / 30);
+            continue;
         }
 
         if (!alarmoState) {
@@ -543,13 +581,10 @@ int main() {
         }
 
         C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
-        C2D_TargetClear(renderTop, C2D_Color32(0x00,0x00,0x00,0xFF));
+        C2D_TargetClear(renderTop, C2D_Color32(0x00, 0x00,0x00,0xFF));
 		C2D_SceneBegin(renderTop);
 		{
-            if (!alarmoRinging || (alarmoRinging && osGetTime()%1000 < 500) || alarmoShut) {
-                time_t unixTime = time(NULL);
-                alarmoCurTime = gmtime((const time_t*)&unixTime);
-
+            if (!alarmoRinging || (alarmoRinging && osTime%1000 < 500) || alarmoShut) {
                 {
                     C2D_TextBufClear(hourBuf);
                     C2D_Text hourText;
@@ -672,9 +707,9 @@ int main() {
                 if (alarmoRinging)
                     snprintf(botChar, sizeof(botChar), "Time up!");
                 else if (alarmoRepeatAt != 0) {
-                    u32 remainS = (u32)((alarmoRepeatAt-osGetTime()) / 1000);
+                    u32 remainS = (u32)((alarmoRepeatAt-osTime) / 1000);
                     snprintf(botChar, sizeof(botChar), "Repeat in: %02hhu:%02hhu", (u8)(remainS/60), (u8)(remainS%60));
-                } else if (osGetTime() < alarmoTinyNotifyCur.end) {
+                } else if (osTime < alarmoTinyNotifyCur.end) {
                     snprintf(botChar, sizeof(botChar), alarmoTinyNotifyCur.msg);
                 } else {
                     const u32 secdt = (
@@ -727,6 +762,13 @@ int main() {
         }
 		C3D_FrameEnd(0);
     }
+
+    // Restore sleep mode
+    mcuHwcInit();
+    MCUHWC_ReadRegister(0x18, &im, 4);
+    im &= ~(1<<5);
+    MCUHWC_WriteRegister(0x18, &im, 4);
+    mcuHwcExit();
 
     alarmoGetOut = true;
     threadJoin(mainParamT, U64_MAX);
