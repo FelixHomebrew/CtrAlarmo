@@ -3,6 +3,8 @@
 #include <3ds.h>
 #include <string.h>
 
+#include <alarmo/routine.h>
+
 rgbl_McuLedPattern alarmoRgbBeep0 = {
     {0x20, 0x00, 0xFF, 0x00},
     {0, 0xFF, 0},
@@ -22,13 +24,18 @@ rgbl_McuLedPattern alarmoRgbEnd = {
  */
 
 bool setPattern(/*FnfHw::McuLedPattern*/ rgbl_McuLedPattern pat) {
+    svcWaitSynchronization(alarmoMutex, U64_MAX);
     Handle srvHandle = 0;
-    if (srvGetServiceHandle(&srvHandle, "ptm:sysm") != 0) return false;
+    if (srvGetServiceHandle(&srvHandle, "ptm:sysm") != 0) {
+        svcReleaseMutex(alarmoMutex);
+        return false;
+    }
     u32* ipc = getThreadCommandBuffer();
     ipc[0] = 0x8010640;
     memcpy(&ipc[1], &pat, 0x64);
     svcSendSyncRequest(srvHandle);
     svcCloseHandle(srvHandle);
+    svcReleaseMutex(alarmoMutex);
     return true;
 }
 

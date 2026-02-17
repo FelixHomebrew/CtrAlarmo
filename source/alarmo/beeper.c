@@ -136,9 +136,9 @@ void beepEndCb() {
         MCUHWC_WriteRegister(0x28, &mcuPWB, 1);
         mcuHwcExit();
     }
-    alarmoTinyNotify("Stopped.", 3);
-
     svcReleaseMutex(alarmoMutex);
+
+    alarmoTinyNotify("Stopped.", 3);
 
     rgbl_changeLed(alarmoRgbEnd);
     beepEmit(1661, 100, true);

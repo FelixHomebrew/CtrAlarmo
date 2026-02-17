@@ -140,16 +140,18 @@ int main() {
         u32 kDown = hidKeysDown();
         if (alarmoRinging || alarmoRepeatAt != 0) {
             if (kDown) {
-                svcWaitSynchronization(alarmoMutex, U64_MAX);
+                //svcWaitSynchronization(alarmoMutex, U64_MAX);
                 alarmoShut = true;
-                svcReleaseMutex(alarmoMutex);
+                //svcReleaseMutex(alarmoMutex);
             }
         }
 
-        // Checks for lid (Prevents BEEP?)
+        // Checks for lid
+        svcWaitSynchronization(alarmoMutex, U64_MAX);
         ptmuInit();
         PTMU_GetShellState(&shell[0]);
         ptmuExit();
+        svcReleaseMutex(alarmoMutex);
         if (shell[0] != shell[1]) {
             if (shell[0]) {
                 // Disables Streetpass state + Restore power LED state
