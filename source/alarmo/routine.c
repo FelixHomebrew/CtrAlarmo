@@ -16,10 +16,9 @@ void alarmoMainInit() {
         "SELECT      Settings\n"
         "D-PAD UP    Increase brightness\n"
         "D-PAD DOWN  Decrease brightness\n"
-        "%s       Quit\n\n"
-        "When alarm rings, press\nany button to shut it.\nBeep sound is muted while sleep mode."
-        CONSOLE_RESET,
-        envIsHomebrew() ? "START" : "HOME "
+        "START       Quit\n\n"
+        "When alarm rings, press\nany button to shut it."
+        CONSOLE_RESET
     );
 
     gfxScreenSwapBuffers(GFX_BOTTOM, false);
@@ -54,9 +53,6 @@ void alarmoMainInit() {
 
 void mainPara(void* p) {
     u8 lastsec = 0;
-
-    // Avoids audio to be only emitted to JACK while sleep mode
-    alarmoForceHeadphoneOut(false);
 
     while (/*!aptShouldClose() &&*/ !alarmoGetOut) {
         if (alarmoStop) {

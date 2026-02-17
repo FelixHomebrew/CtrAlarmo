@@ -1,5 +1,5 @@
 # CTR Alarmo
-A simple, configurable alarm clock app for the Nintendo 3DS made with libctru
+Simple, configurable alarm clock app for the Nintendo 3DS made with libctru
 
 ![insc](./docres/insc.png)
 

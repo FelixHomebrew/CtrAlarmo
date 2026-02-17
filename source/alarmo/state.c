@@ -1,5 +1,7 @@
 #include <alarmo/state.h>
 
+#include <alarmo/routine.h>
+
 bool alarmoState = true;
 
 volatile bool alarmoShut = false;

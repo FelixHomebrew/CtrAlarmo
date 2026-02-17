@@ -10,9 +10,8 @@ void alarmoTinyNotify(char* msg, u8 sec) {
     alarmoTinyNotifyCur.end = osGetTime() + 1000*sec;
     svcReleaseMutex(alarmoMutex);
 }
-#include <stdio.h>
-Result alarmoForceHeadphoneOut(bool enable)
-{
+
+Result alarmoForceHeadphoneOut(bool enable) {
     Result res;
 
     Handle dspHandle;

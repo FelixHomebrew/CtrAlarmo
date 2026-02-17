@@ -36,14 +36,25 @@ static void alarmoSetSwitch(u8 flag) {
 
 PtmSleepConfig ptmEvCfg;
 
-aptHookCookie cookie;
+/**
+ * Forced JACK redirection in sleep mode is retablished on
+ * every HOME menu resume; But after a certain amount of resume with
+ * alarmoForceHeadphoneOut(false), the next HOME menu call will simply freeze.
+ * For now I couldn't found any solution for this issue, I disable HOME menu calls.
+ */
+/*
+aptHookCookie alarmoAptCk;
 static void aptHookFunc(APT_HookType hookType, void* param) {
+    printf("HS\n");
+
     switch (hookType) {
         case APTHOOK_ONSUSPEND:
+            //svcWaitSynchronization(alarmoEcMutex, 1000000000);
             if (alarmoRinging) alarmoShut = true;
             gspLcdInit();
             GSPLCD_PowerOnAllBacklights();
             gspLcdExit();
+            //svcReleaseMutex(alarmoEcMutex);
             break;
         case APTHOOK_ONRESTORE:
             if (alarmoRinging) alarmoShut = true;
@@ -52,30 +63,36 @@ static void aptHookFunc(APT_HookType hookType, void* param) {
                 GSPLCD_PowerOffBacklight(GSPLCD_SCREEN_BOTTOM);
                 gspLcdExit();
             }
+            // Is re-enabled after HOME menu call
+            alarmoForceHeadphoneOut(false);
             break;
         default:
             break;
     }
-}
+
+    printf("HE\n");
+}*/
 
 int main() {
     gfxInitDefault();
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
     C2D_Init(4096);
     C2D_Prepare();
+    C3D_FrameRate(30.0f);
 
     consoleInit(GFX_BOTTOM, NULL);
 
     aptInit();
 
-    // Ensure mainPara is active while sleep mode
+    // Ensure main & mainPara are active while sleep mode
     aptSetSleepAllowed(false);
+    aptSetHomeAllowed(false);
 
-    APT_SetAppCpuTimeLimit(4);
+    APT_SetAppCpuTimeLimit(10);
 
     ndmuInit();
 
-    aptHook(&cookie, aptHookFunc, NULL);
+    //aptHook(&alarmoAptCk, aptHookFunc, NULL);
 
     fsInit();
     romfsInit();
@@ -100,6 +117,9 @@ int main() {
 
     svcCreateMutex(&alarmoMutex, false);
 
+    // Avoids audio to be only emitted to JACK while sleep mode
+    alarmoForceHeadphoneOut(false);
+
     Thread mainParamT;
     {
         s32 prio;
@@ -120,7 +140,9 @@ int main() {
         u32 kDown = hidKeysDown();
         if (alarmoRinging || alarmoRepeatAt != 0) {
             if (kDown) {
+                svcWaitSynchronization(alarmoMutex, U64_MAX);
                 alarmoShut = true;
+                svcReleaseMutex(alarmoMutex);
             }
         }
 
@@ -139,6 +161,7 @@ int main() {
                 }
                 gspLcdInit();
                 if (alarmoSettings & ASET_POBS) {
+                    svcSleepThread(300000000); // Too early simply does nothing
                     GSPLCD_PowerOffBacklight(GSPLCD_SCREEN_BOTTOM);
                 }
                 gspLcdExit();
@@ -403,7 +426,7 @@ int main() {
                 GSPLCD_SetBrightnessRaw(GSPLCD_SCREEN_BOTTOM, nb);
                 gspLcdExit();
             }
-            if (kDown & KEY_START && envIsHomebrew()) break;
+            if (kDown & KEY_START) break;
             if (kDown & KEY_SELECT) {
                 alarmoSettingsInit();
                 continue;
@@ -418,6 +441,8 @@ int main() {
     im &= ~(1<<5);
     MCUHWC_WriteRegister(0x18, &im, 4);
     mcuHwcExit();*/
+
+    alarmoForceHeadphoneOut(true);
 
     alarmoGetOut = true;
     threadJoin(mainParamT, U64_MAX);
@@ -435,7 +460,8 @@ int main() {
     //ptmSysmExit();
     ndmuExit();
 
-    aptUnhook(&cookie);
+    //aptUnhook(&alarmoAptCk);
+    aptSetHomeAllowed(true);
     aptSetSleepAllowed(true);
     aptExit();
 

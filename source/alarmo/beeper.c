@@ -1,10 +1,12 @@
 #include <alarmo/beeper.h>
 
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <alarmo/mcuHwc.h>
 #include <alarmo/rgbl.h>
+#include <alarmo/routine.h>
 #include <alarmo/settings.h>
 #include <alarmo/state.h>
 #include <alarmo/utils.h>
@@ -13,7 +15,7 @@
 #define BEEP2_STATE 40 // 4 beeps/s
 #define BEEP3_STATE 60 // 10 beeps/s
 
-#define BEEP_SAMPLERATE 32000
+#define BEEP_SAMPLERATE 64000
 #define BEEP_BYTESPERSAMPLE 4
 
 /*
@@ -61,8 +63,11 @@ bool beepEmit(u16 freq, u16 ms, bool force) {
 	waveBuf[1].data_vaddr = &audioBuffer[totalSamples];
 	waveBuf[1].nsamples = totalSamples;
 
-    for (int i=0; i<totalSamples*2; i++) {
-        s16 sample = INT16_MAX * sin(freq*(2*M_PI)*i/BEEP_SAMPLERATE);
+    // Limits *pops*
+    s16 sample = 0;
+    int i = 0;
+    while (abs(sample) > 0x1000 || i < totalSamples * 2) {
+        sample = INT16_MAX * sin(freq*(2*M_PI)*i++/BEEP_SAMPLERATE);
         audioBuffer[i] = (sample<<16) | (sample & 0xffff);
     }
     DSP_FlushDataCache(audioBuffer, totalSamples * 2);
@@ -122,6 +127,7 @@ bool beepCb() {
     return alarmoStop;
 }
 void beepEndCb() {
+    svcWaitSynchronization(alarmoMutex, U64_MAX);
     if (alarmoRepeatAt != 0) alarmoRepeatAt = 0;
 
     if (alarmoSettings & ASET_PWLB) {
@@ -131,6 +137,8 @@ void beepEndCb() {
         mcuHwcExit();
     }
     alarmoTinyNotify("Stopped.", 3);
+
+    svcReleaseMutex(alarmoMutex);
 
     rgbl_changeLed(alarmoRgbEnd);
     beepEmit(1661, 100, true);
