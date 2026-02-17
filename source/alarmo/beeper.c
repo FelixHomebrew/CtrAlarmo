@@ -15,7 +15,7 @@
 #define BEEP2_STATE 40 // 4 beeps/s
 #define BEEP3_STATE 60 // 10 beeps/s
 
-#define BEEP_SAMPLERATE 64000
+#define BEEP_SAMPLERATE 32000
 #define BEEP_BYTESPERSAMPLE 4
 
 /*
@@ -39,10 +39,10 @@ bool beepEmit(u16 freq, u16 ms, bool force) {
         return !alarmoRinging;
     }
 
-    const u32 totalSamples = (u32)(BEEP_SAMPLERATE / (float)(1000/ms) / 2);
+    const u32 totalFrames = (u32)((float)BEEP_SAMPLERATE * (float)(ms/1e3));
 
-    ndspWaveBuf waveBuf[2];
-	u32 *audioBuffer = (u32*)linearAlloc(totalSamples*BEEP_BYTESPERSAMPLE*2);
+    static ndspWaveBuf waveBuf;
+	u32* audioBuffer = (u32*)linearAlloc(totalFrames*BEEP_BYTESPERSAMPLE);
 
 	ndspSetOutputMode(NDSP_OUTPUT_STEREO);
 
@@ -57,28 +57,23 @@ bool beepEmit(u16 freq, u16 ms, bool force) {
 	mix[1] = 1.0;
 	ndspChnSetMix(0, mix);
 
-	memset(waveBuf,0,sizeof(waveBuf));
-	waveBuf[0].data_vaddr = &audioBuffer[0];
-	waveBuf[0].nsamples = totalSamples;
-	waveBuf[1].data_vaddr = &audioBuffer[totalSamples];
-	waveBuf[1].nsamples = totalSamples;
+	memset(&waveBuf, 0, sizeof(waveBuf));
+	waveBuf.data_vaddr = audioBuffer;
+	waveBuf.nsamples = totalFrames;
 
     // Limits *pops*
-    s16 sample = 0;
-    int i = 0;
-    while (abs(sample) > 0x1000 || i < totalSamples * 2) {
-        sample = INT16_MAX * sin(freq*(2*M_PI)*i++/BEEP_SAMPLERATE);
+    for (int i = 0; i < totalFrames; i++) {
+        s16 sample = INT16_MAX * sin(freq*(2*M_PI)*i/BEEP_SAMPLERATE);
         audioBuffer[i] = (sample<<16) | (sample & 0xffff);
     }
-    DSP_FlushDataCache(audioBuffer, totalSamples * 2);
+    DSP_FlushDataCache(audioBuffer, totalFrames*BEEP_BYTESPERSAMPLE);
 
-	ndspChnWaveBufAdd(0, &waveBuf[0]);
-	ndspChnWaveBufAdd(0, &waveBuf[1]);
+	ndspChnWaveBufAdd(0, &waveBuf);
 
-    /*while (!((waveBuf[0].status == NDSP_WBUF_DONE && waveBuf[1].status == NDSP_WBUF_DONE) || !alarmoRinging || !force))
-	    svcSleepThread(1000000);*/
-    svcSleepThread(1250000*ms);
-    
+    while (waveBuf.status != NDSP_WBUF_DONE || (!alarmoRinging && !force))
+	    svcSleepThread(1250000);
+
+    ndspChnWaveBufClear(0);
     linearFree(audioBuffer);
 
     return alarmoStop;
